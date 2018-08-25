@@ -13,46 +13,46 @@ class WalletViewController: UIViewController, UIScrollViewDelegate {
 
     @IBOutlet weak var balanceScrollView: UIScrollView!
     @IBOutlet weak var balancePageControl: UIPageControl!
-    @IBOutlet weak var transactionsQuantityLabelView: UILabel!
     @IBOutlet weak var blockchainStatusLabelView: UILabel!
     @IBOutlet weak var xvgFiatPriceLabelView: UILabel!
+    @IBOutlet weak var xvgFiatLabel: UILabel!
     @IBOutlet weak var walletSlideScrollView: UIScrollView!
     @IBOutlet weak var walletSlidePageControl: UIPageControl!
     
     var balanceSlides: [BalanceSlide] = []
     var walletSlides: [WalletSlideView] = []
-    
-    var xvgInfo: XvgInfo?
-    
+
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
+    }
+
+    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
+        return .fade
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
         self.setupSlides()
-        
-        StatisicsAPIClient.shared.infoBy(currency: "EUR") { info in
-            self.xvgInfo = info
-            
-            DispatchQueue.main.async {
-                self.xvgFiatPriceLabelView.text = info?.display.price
-            }
+        self.setStats()
+
+        DispatchQueue.main.async {
+            // Set the balance scroll view current page to users defaults.
+            self.balanceScrollView.setCurrent(page: WalletManager.default.currentBalanceSlide)
         }
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didReceiveStats(notification:)),
+            name: .didReceiveStats,
+            object: nil
+        )
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
         UIApplication.shared.statusBarStyle = .lightContent
-        
-        NotificationCenter.default.addObserver(self, selector: #selector(deviceRotated), name: NSNotification.Name.UIDeviceOrientationDidChange, object: nil)
-    }
-    
-    override func viewWillDisappear(_ animated: Bool) {
-        NotificationCenter.default.removeObserver(self, name: NSNotification.Name.UIDeviceOrientationDidChange, object: nil)
-    }
-
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
     }
     
     func setupSlides() {
@@ -61,10 +61,6 @@ class WalletViewController: UIViewController, UIScrollViewDelegate {
         
         self.walletSlideScrollView.delegate = self
         self.walletSlides = self.createWalletSlides()
-        
-        if (UIDevice.current.userInterfaceIdiom == .pad) {
-            walletSlidePageControl.numberOfPages = 2
-        }
         
         DispatchQueue.main.async {
             self.setupBalanceSlideScrollView()
@@ -86,16 +82,18 @@ class WalletViewController: UIViewController, UIScrollViewDelegate {
     func createBalanceSlides() -> [BalanceSlide] {
         let xvgBalance = Bundle.main.loadNibNamed("XVGBalanceView", owner: self, options: nil)?.first as! XVGBalanceView
         let fiatBalance = Bundle.main.loadNibNamed("FiatBalanceView", owner: self, options: nil)?.first as! FiatBalanceView
+        let placeholderBalance = Bundle.main.loadNibNamed("PlaceholderView", owner: self, options: nil)?.first as! PlaceholderView
         
         return [
             xvgBalance,
-            fiatBalance
+            fiatBalance,
+            placeholderBalance
         ]
     }
     
     func setupBalanceSlideScrollView() {
         let contentSizeWidth = balanceScrollView.frame.width * CGFloat(balanceSlides.count)
-        
+
         balanceScrollView.contentSize = CGSize(width: contentSizeWidth, height: balanceScrollView.frame.height)
         
         for i in 0 ..< balanceSlides.count {
@@ -122,57 +120,58 @@ class WalletViewController: UIViewController, UIScrollViewDelegate {
     }
     
     func setupWalletSlideScrollView() {
-        var contentSizeWidth = walletSlideScrollView.frame.width * CGFloat(walletSlides.count)
-        if (UIDevice.current.userInterfaceIdiom == .pad) {
-            contentSizeWidth = walletSlideScrollView.frame.width * 2
-        }
-        
-        walletSlideScrollView.contentSize = CGSize(width: contentSizeWidth, height: walletSlideScrollView.frame.height)
+        walletSlideScrollView.contentSize = CGSize(
+            width: walletSlideScrollView.frame.width * CGFloat(walletSlides.count),
+            height: walletSlideScrollView.frame.height
+        )
         
         for i in 0 ..< walletSlides.count {
-            var slideX = walletSlideScrollView.frame.width * CGFloat(i)
-            var slideWidth = walletSlideScrollView.frame.width
-            if (UIDevice.current.userInterfaceIdiom == .pad) {
-                if (i == 0) {
-                    slideX = 0
-                    slideWidth = slideWidth - 300
-                } else if (i == 1) {
-                    slideX = slideWidth - 300
-                    slideWidth = 300
-                } else if (i == 2) {
-                    slideX = slideWidth * 1
-                }
-            }
+            let slideX = walletSlideScrollView.frame.width * CGFloat(i)
+            let slideWidth = walletSlideScrollView.frame.width
             
-            walletSlides[i].frame = CGRect(x: slideX, y: 0, width: slideWidth, height: walletSlideScrollView.frame.height)
+            walletSlides[i].frame = CGRect(
+                x: slideX,
+                y: 0,
+                width: slideWidth,
+                height: walletSlideScrollView.frame.height
+            )
         }
     }
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         if (scrollView == balanceScrollView) {
-            self.balancePageControl.currentPage = Int(round(balanceScrollView.contentOffset.x/balanceScrollView.frame.width))
+            let currentPage = Int(round(balanceScrollView.contentOffset.x/balanceScrollView.frame.width))
+            self.balancePageControl.currentPage = currentPage
+
+            DispatchQueue.main.async {
+                // Save the balance slide current page.
+                WalletManager.default.currentBalanceSlide = currentPage
+            }
         }
         
         if (scrollView == walletSlideScrollView) {
-            self.walletSlidePageControl.currentPage = Int(round(walletSlideScrollView.contentOffset.x/walletSlideScrollView.frame.width))
+            let currentPage = Int(round(walletSlideScrollView.contentOffset.x/walletSlideScrollView.frame.width))
+            self.walletSlidePageControl.currentPage = currentPage
         }
     }
-    
+
     @objc func deviceRotated() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.setupBalanceSlideScrollView()
             self.setupWalletSlideScrollView()
         }
     }
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
+    
+    @objc func didReceiveStats(notification: Notification? = nil) {
+        self.setStats()
     }
-    */
+    
+    func setStats() {
+        DispatchQueue.main.async {
+            if let xvgInfo = PriceTicker.shared.xvgInfo {
+                self.xvgFiatPriceLabelView.text = xvgInfo.display.price
+                self.xvgFiatLabel.text = "\(WalletManager.default.currency)/XVG"
+            }
+        }
+    }
 
 }

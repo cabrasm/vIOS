@@ -9,23 +9,27 @@
 import UIKit
 
 class LoadingTorViewController: UIViewController {
+    
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
+    }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
+    func completeLoading() {
+        let identifier = WalletManager.default.setup ? "showWallet" : "showWelcomeView"
 
-        TorClient.shared.observeConnection { connected in
-            if (!connected) {
-                print("Whoops! Tor couldn't connect! 🤦‍♀️")
-            }
-            
-            // Here we can determine whether to show
-            // the wallet or the welcome guide.
-            DispatchQueue.main.sync {
-                let identifier = WalletManager.default.setup ? "showWallet" : "showWelcomeView"
-                
-                self.performSegue(withIdentifier: identifier, sender: self)
+        self.performSegue(withIdentifier: identifier, sender: self)
+    }
+
+    // MARK: - Navigation
+
+    // In a storyboard-based application, you will often want to do a little preparation before navigation
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "showWallet" {
+            let vc = segue.destination as! PinUnlockViewController
+            vc.fillPinFor = .wallet
+            vc.completion = { authenticated in
+                vc.performSegue(withIdentifier: "showWallet", sender: vc)
             }
         }
     }
-
 }

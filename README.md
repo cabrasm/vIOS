@@ -2,7 +2,7 @@
 <p align="center">
   <a href="https://travis-ci.org/vergecurrency/vIOS" target="_blank"><img src="https://travis-ci.org/vergecurrency/vIOS.svg?branch=master"></a>
   <img src="https://img.shields.io/badge/status-development-red.svg">
-  <img src="https://img.shields.io/badge/latest build-0.2.1-lightgrey.svg">
+  <img src="https://img.shields.io/badge/latest build-0.4-lightgrey.svg">
   <img src="https://img.shields.io/badge/iOS-^11.4-green.svg">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg">
 </p>
@@ -46,7 +46,6 @@ carthage checkout && carthage build --platform iOS
 * [hackiftekhar/IQKeyboardManager](https://github.com/hackiftekhar/IQKeyboardManager) - Makes working with keyboards and inputs painless
 * [aschuch/QRCode](https://github.com/aschuch/QRCode) - Generates beautiful QR codes for receiving XVG
 * [SwiftyJSON/SwiftyJSON](https://github.com/SwiftyJSON/SwiftyJSON) - Helps working with JSON responses
-* [hyperoslo/BarcodeScanner](https://github.com/hyperoslo/BarcodeScanner) - Reading QR codes easily with this awesome package
 * [evgenyneu/keychain-swift](https://github.com/evgenyneu/keychain-swift) - Takes away the worries of saving sensitive user data on your device
 
 ### Community
@@ -65,11 +64,3 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduc
 
 * **Swen van Zanten** - *Main developer* - [SwenVanZanten](https://github.com/SwenVanZanten)
 * **Marvin Piekarek** - *Main developer* - [marpme](https://github.com/marpme)
-
-## Donate
-
-You want to support the development of this project?
-And buy us a ☕️ or a 🍺, use one of the below.
-
-XVG: DDd1pVWr8PPAw1z7DRwoUW6maWh5SsnCcp (Verge Currency)  
-XVG: DPEgHsW1Sox3m6ZiYVjiqVxak4NAThXXix (Swen)
