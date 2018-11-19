@@ -16,13 +16,13 @@ class ConfirmPaperkeyViewController: AbstractPaperkeyViewController {
     @IBOutlet weak var firstWordTextfield: UITextField!
     @IBOutlet weak var secondWordTextfield: UITextField!
     
-    var words: [String] = []
+    var mnemonic: [String] = []
     var randomNumbers: [Int] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        print(self.words)
+        print(self.mnemonic)
         
         self.randomNumbers = self.selectRandomNumbers()
         
@@ -54,26 +54,25 @@ class ConfirmPaperkeyViewController: AbstractPaperkeyViewController {
         self.firstWordTextfield.backgroundColor = .white
         
         // Add shake effect...
-        if (self.firstWordTextfield.text != self.words[self.randomNumbers.first! - 1]) {
+        if (self.firstWordTextfield.text != self.mnemonic[self.randomNumbers.first! - 1]) {
             self.firstWordTextfield.backgroundColor = UIColor.vergeRed().withAlphaComponent(0.15)
             return
         }
         
-        if (self.secondWordTextfield.text != self.words[self.randomNumbers.last! - 1]) {
+        if (self.secondWordTextfield.text != self.mnemonic[self.randomNumbers.last! - 1]) {
             self.secondWordTextfield.backgroundColor = UIColor.vergeRed().withAlphaComponent(0.15)
             return
         }
-        
-        self.performSegue(withIdentifier: "finishWelcomeGuide", sender: self)
-    }
-    
-    // MARK: - Navigation
 
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
-        super.prepare(for: segue, sender: sender)
+        if ApplicationManager.default.setup {
+            return dismiss(animated: true)
+        }
+
+        // Save the mnemonic.
+        ApplicationManager.default.mnemonic = mnemonic
+
+        // Finish the welcome guide.
+        self.performSegue(withIdentifier: "finishWelcomeGuide", sender: self)
     }
 
 }

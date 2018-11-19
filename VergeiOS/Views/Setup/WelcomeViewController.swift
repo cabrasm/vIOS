@@ -13,15 +13,29 @@ class WelcomeViewController: UIViewController {
     override var preferredStatusBarStyle: UIStatusBarStyle {
         return .lightContent
     }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
 
-    override func viewWillAppear(_ animated: Bool) {
-        // This view uses the light status bar.
-        UIApplication.shared.statusBarStyle = .lightContent
-        
-        InsightAPIClient().getInfo() { data in
-            // Do something with the data
-        }
+        // TODO: Create a Tor setup page and move this over.
+        // Set Tor enabled as default.
+        ApplicationManager.default.useTor = true
+        // Now start Tor.
+        TorClient.shared.start {}
     }
 
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        super.prepare(for: segue, sender: sender)
+
+        guard let navigationController = segue.destination as? UINavigationController else {
+            return
+        }
+
+        ApplicationManager.default.reset()
+
+        if let vc = navigationController.viewControllers.first as? SelectPinViewController {
+            vc.segueIdentifier = segue.identifier
+        }
+    }
 }
 

@@ -17,6 +17,13 @@ class ConfirmSendView: UIView {
     @IBOutlet weak var recipientAddressLabel: UILabel!
 
     var transaction: SendTransaction!
+    var margin: CGFloat {
+        if #available(iOS 12.0, *) {
+            return 8.0
+        } else {
+            return 10.0
+        }
+    }
 
     func makeActionSheet() -> UIAlertController {
         let viewHeight: CGFloat = subviews.first?.frame.height ?? 0
@@ -26,7 +33,6 @@ class ConfirmSendView: UIView {
 
         let alertController = UIAlertController(title: enters, message: nil, preferredStyle: .actionSheet)
 
-        let margin: CGFloat = 10.0
         frame = CGRect(
             x: 0,
             y: 0,
@@ -52,7 +58,7 @@ class ConfirmSendView: UIView {
         if let xvgInfo = PriceTicker.shared.xvgInfo {
             let transactionFee = 0.1
             let totalXVG = transaction.amount.doubleValue + transactionFee
-            let totalFiat = totalXVG * xvgInfo.raw.price
+            let totalFiat = totalXVG * xvgInfo.price
 
             sendingAmountLabel.text = transaction.amount.toCurrency(currency: "XVG")
             transactionFeeAmountLabel.text = NSNumber(floatLiteral: 0.1).toCurrency(currency: "XVG")
@@ -63,7 +69,7 @@ class ConfirmSendView: UIView {
             )
 
             totalFiatAmountLabel.text = NSNumber(floatLiteral: totalFiat).toCurrency(
-                currency: WalletManager.default.currency,
+                currency: ApplicationManager.default.currency,
                 fractDigits: 6
             )
 

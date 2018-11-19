@@ -8,26 +8,31 @@
 
 import UIKit
 
-enum CurrencySwitch {
-    case XVG
-    case FIAT
-}
+class SendViewController: UIViewController {
 
-class SendViewController: UIViewController, RecipientDelegate, AmountDelegate {
+    enum CurrencySwitch {
+        case XVG
+        case FIAT
+    }
 
     @IBOutlet weak var xvgCardContainer: UIView!
     @IBOutlet weak var noBalanceView: UIView!
     @IBOutlet weak var walletAmountLabel: UILabel!
-    @IBOutlet weak var recipientTextField: SelectorButton!
-    @IBOutlet weak var amountTextField: SelectorButton!
+    @IBOutlet weak var recipientTextField: UITextField!
+    @IBOutlet weak var currencyLabel: UILabel!
+    @IBOutlet weak var amountTextField: UITextField!
     @IBOutlet weak var memoTextField: UITextField!
     @IBOutlet weak var confirmButton: UIButton!
-    
+
+    let transactionFee = 0.1
     var currency = CurrencySwitch.XVG
-    var walletAmount: NSNumber = WalletManager.default.amount
-    var amount: NSNumber = 0.0
+    var sendTransaction = SendTransaction()
     
     var confirmButtonInterval: Timer?
+
+    var walletAmount: NSNumber {
+        return ApplicationManager.default.amount
+    }
 
     override var prefersStatusBarHidden: Bool {
         return false
@@ -43,6 +48,12 @@ class SendViewController: UIViewController, RecipientDelegate, AmountDelegate {
         confirmButtonInterval = setInterval(1) {
             self.isSendable()
         }
+
+        amountTextField.addTarget(self, action: #selector(amountTextFieldDidChange), for: .editingChanged)
+        amountTextField.addTarget(self, action: #selector(amountChanged), for: .editingDidEnd)
+        amountTextField.text = amountTextField.text?.currencyInputFormatting()
+
+        setupRecipientTextFieldKeyBoardToolbar()
 
         DispatchQueue.main.async {
             self.updateAmountLabel()
@@ -60,6 +71,10 @@ class SendViewController: UIViewController, RecipientDelegate, AmountDelegate {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
 
+        if walletAmount.doubleValue <= transactionFee {
+            noBalanceView.isHidden = false
+        }
+
         self.xvgCardContainer.alpha = 0.0
         self.xvgCardContainer.center.y += 20.0
 
@@ -68,52 +83,64 @@ class SendViewController: UIViewController, RecipientDelegate, AmountDelegate {
             self.xvgCardContainer.center.y -= 20.0
         }, completion: nil)
 
-        updateWalletAmount()
         updateWalletAmountLabel()
         updateAmountLabel()
     }
 
     @objc func didReceiveStats(_ notification: Notification) {
-        updateWalletAmount()
         updateAmountLabel()
         updateWalletAmountLabel()
     }
 
-    @IBAction func switchCurrency(_ sender: UIBarButtonItem) {
+    @IBAction func switchCurrency(_ sender: Any) {
         currency = (currency == .XVG) ? .FIAT : .XVG
+        currencyLabel.text = currency == .XVG ? "XVG" : ApplicationManager.default.currency
 
-        // Get current price.
-        if let xvgInfo = PriceTicker.shared.xvgInfo {
-            if currency == .XVG {
-                sender.title = "XVG"
-                amount = NSNumber(value: Double(truncating: amount) / xvgInfo.raw.price)
-                walletAmount = NSNumber(value: Double(truncating: walletAmount) / xvgInfo.raw.price)
-            } else {
-                sender.title = WalletManager.default.currency
-                amount = NSNumber(value: Double(truncating: amount) * xvgInfo.raw.price)
-                walletAmount = NSNumber(value: Double(truncating: walletAmount) * xvgInfo.raw.price)
-            }
-        }
-
-        self.updateWalletAmountLabel()
-        self.updateAmountLabel()
-    }
-
-    func updateWalletAmount() {
-        walletAmount = WalletManager.default.amount
+        updateWalletAmountLabel()
+        updateAmountLabel()
     }
 
     func updateWalletAmountLabel() {
-        let amountLeft = NSNumber(floatLiteral: walletAmount.doubleValue - amount.doubleValue - 0.1)
-        self.walletAmountLabel.text = amountLeft.toCurrency(currency: getCurrencyString())
+        var amount = NSNumber(floatLiteral: walletAmount.doubleValue - sendTransaction.amount.doubleValue - transactionFee)
+        if currency == .FIAT {
+            amount = convertXvgToFiat(amount)
+        }
+
+        if amount.decimalValue < 0.0 {
+            amount = NSNumber(value: 0.0)
+        }
+        
+        DispatchQueue.main.async {
+            self.walletAmountLabel.text = amount.toCurrency(currency: self.currentCurrency())
+        }
     }
 
     func updateAmountLabel() {
-        self.amountTextField.valueLabel?.text = amount.toCurrency(currency: getCurrencyString(), fractDigits: 6)
+        // Change the text color of the amount label when the selected amount is
+        // more then the wallet amount.
+        DispatchQueue.main.async {
+            self.amountTextField.text = String(Int(self.currentAmount().doubleValue * 100)).currencyInputFormatting()
+            
+            if self.walletAmount.doubleValue == 0.0 {
+                return
+            }
+
+            if (self.currentAmount().doubleValue >= self.walletAmount.doubleValue) {
+                self.amountTextField.textColor = UIColor.vergeRed()
+                
+                self.notifySelectedToMuchAmount()
+            } else {
+                self.amountTextField.textColor = UIColor.secondaryDark()
+            }
+        }
     }
 
-    func getCurrencyString() -> String {
-        return currency == .XVG ? "XVG" : WalletManager.default.currency
+    func convertXvgToFiat(_ amount: NSNumber) -> NSNumber {
+        if let xvgInfo = PriceTicker.shared.xvgInfo {
+            return NSNumber(value: amount.doubleValue * xvgInfo.price)
+        }
+
+        return amount
     }
 
     // MARK: - Navigation
@@ -125,23 +152,23 @@ class SendViewController: UIViewController, RecipientDelegate, AmountDelegate {
 
         if segue.identifier == "scanQRCode" {
             let vc = segue.destination as! ScanQRCodeViewController
-            vc.delegate = self
+            vc.sendTransactionDelegate = self
         }
 
         if segue.identifier == "selectRecipient" {
             let nc = segue.destination as! UINavigationController
             let vc = nc.viewControllers.first as! SelectRecipientTableViewController
-            vc.delegate = self
-        }
-
-        if segue.identifier == "setAmount" {
-            let vc = segue.destination as! SetAmountViewController
-            vc.delegate = self
+            vc.sendTransactionDelegate = self
         }
     }
 
     func isSendable() {
-        let enabled = currentAmount().doubleValue > 0.0 && selectedRecipientAddress() != ""
+        // Selected amount is higher then nothing.
+        // Selected amount is lower then wallet amount.
+        // Address is set.
+        let enabled = sendTransaction.amount.doubleValue > 0.0
+            && sendTransaction.amount.doubleValue < walletAmount.doubleValue
+            && sendTransaction.address != ""
 
         confirmButton.isEnabled = enabled
         confirmButton.backgroundColor = (enabled ? UIColor.primaryLight() : UIColor.vergeGrey())
@@ -154,16 +181,13 @@ class SendViewController: UIViewController, RecipientDelegate, AmountDelegate {
             options: nil
         )?.first as! ConfirmSendView
 
-        let transaction = SendTransaction()
-        transaction.amount = currentAmount()
-        transaction.address = selectedRecipientAddress()
-
-        confirmSendView.setTransaction(transaction)
+        confirmSendView.setTransaction(sendTransaction)
         let alertController = confirmSendView.makeActionSheet()
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
-        let sendAction = UIAlertAction(title: "Send", style: .default) { alert in
+        let sendAction = UIAlertAction(title: "Send XVG", style: .default) { alert in
             self.sendXvg()
         }
+        sendAction.setValue(UIImage(named: "Send"), forKey: "image")
 
         alertController.addAction(sendAction)
         alertController.addAction(cancelAction)
@@ -184,47 +208,204 @@ class SendViewController: UIViewController, RecipientDelegate, AmountDelegate {
         unlockView.fillPinFor = .sending
         unlockView.cancelable = true
         unlockView.completion = { aunthenticated in
-            if !aunthenticated {
-                return unlockView.dismiss(animated: true)
-            }
-
             unlockView.dismiss(animated: true)
 
-            // TODO ofcourse...
-            let newWalletAmount = NSNumber(floatLiteral: self.walletAmount.doubleValue - self.amount.doubleValue - 0.1)
-            WalletManager.default.amount = newWalletAmount
+            if !aunthenticated {
+                return
+            }
 
-            self.didSelectRecipientAddress("")
-            self.didChangeAmount(0)
-            self.updateWalletAmount()
-            self.memoTextField.text = ""
+            let proposal = TxProposal(
+                address: self.sendTransaction.address,
+                amount: self.sendTransaction.amount,
+                message: self.sendTransaction.memo
+            )
+
+            let sendingView = Bundle.main.loadNibNamed(
+                "SendingView",
+                owner: self
+            )?.first as! SendingView
+
+            let actionSheet = sendingView.makeActionSheet()
+
+            self.present(actionSheet, animated: true)
+
+            TxTransponder(walletClient: WalletClient.shared).send(proposal: proposal) { txp, error  in
+                self.didChangeSendTransaction(SendTransaction())
+
+                let timeout = (error == nil) ? 3.0 : 0.0
+                let _ = setTimeout(timeout) {
+                    actionSheet.dismiss(animated: true)
+                }
+            }
         }
 
         present(unlockView, animated: true)
     }
-
-    // MARK: - Recipients
-
-    func didSelectRecipientAddress(_ address: String) {
-        self.recipientTextField.valueLabel?.text = address
+    
+    func notifySelectedToMuchAmount() {
+        let amount = amountTextField.text ?? "..."
+        let alert = UIAlertController(
+            title: "That's Too Much! 🤔",
+            message: "You do not have enough balance to send \(amount). Change the amount to send in order to proceed.",
+            preferredStyle: .alert
+        )
+        
+        let okButton = UIAlertAction(title: "Ok", style: .default, handler: nil)
+        
+        alert.addAction(okButton)
+        
+        present(alert, animated: true, completion: nil)
     }
 
-    func selectedRecipientAddress() -> String {
-        return recipientTextField.valueLabel?.text ?? ""
+    @objc func amountTextFieldDidChange(_ textField: UITextField) {
+        if let amountString = textField.text?.currencyInputFormatting() {
+            textField.text = amountString
+        }
     }
 
+    @objc func amountChanged(_ textField: UITextField) {
+        let amount = textField.text?.currencyNumberValue().doubleValue ?? 0
 
-    // MARK: - Amounts
+        sendTransaction.setBy(currency: currentCurrency(), amount: NSNumber(value: amount))
+        didChangeSendTransaction(sendTransaction)
+    }
+}
 
-    func didChangeAmount(_ amount: NSNumber) {
-        self.amount = amount
+extension SendViewController: UITextFieldDelegate {
+    // MARK: - Recipient text field toolbar
+
+    fileprivate func setupRecipientTextFieldKeyBoardToolbar() {
+        let keyboardToolbar = UIToolbar()
+        keyboardToolbar.sizeToFit()
+        keyboardToolbar.tintColor = UIColor.primaryLight()
+
+        let flexBarButton = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let fixedBarButton = UIBarButtonItem(barButtonSystemItem: .fixedSpace, target: nil, action: nil)
+        fixedBarButton.width = 10
+
+        let contactsButton = UIBarButtonItem(
+            image: UIImage(named: "AddContact"),
+            style: .plain,
+            target: self,
+            action: #selector(SendViewController.openRecipientSelector)
+        )
+
+        let pasteButton = UIBarButtonItem(
+            image: UIImage(named: "Paste"),
+            style: .plain,
+            target: self,
+            action: #selector(SendViewController.pasteAddress)
+        )
+
+        let clearButton = UIBarButtonItem(
+            image: UIImage(named: "ClearTextField"),
+            style: .plain,
+            target: self,
+            action: #selector(SendViewController.clearRecipient)
+        )
+
+        let doneBarButton = UIBarButtonItem(
+            barButtonSystemItem: .done,
+            target: self,
+            action: #selector(SendViewController.dissmissKeyboard)
+        )
+
+        keyboardToolbar.items = [
+            contactsButton,
+            fixedBarButton,
+            pasteButton,
+            fixedBarButton,
+            clearButton,
+            flexBarButton,
+            doneBarButton
+        ]
+
+        recipientTextField.inputAccessoryView = keyboardToolbar
+        recipientTextField.delegate = self
+
+        memoTextField.delegate = self
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        dissmissKeyboard()
+
+        return false
+    }
+
+    @objc func openRecipientSelector() {
+        performSegue(withIdentifier: "selectRecipient", sender: self)
+    }
+
+    @objc func pasteAddress() {
+        guard let address = UIPasteboard.general.string else {
+            return
+        }
+
+        AddressValidator().validate(string: address) { valid, address, amount in
+            if !valid {
+                return self.showInvalidAddressAlert()
+            }
+
+            guard let address = address else {
+                return self.showInvalidAddressAlert()
+            }
+
+            self.sendTransaction.address = address
+
+            self.didChangeSendTransaction(self.sendTransaction)
+        }
+    }
+
+    @objc func clearRecipient() {
+        sendTransaction.address = ""
+
+        didChangeSendTransaction(sendTransaction)
+    }
+
+    @objc func dissmissKeyboard() {
+        view.endEditing(true)
+
+        sendTransaction.address = recipientTextField.text ?? ""
+        sendTransaction.memo = memoTextField.text ?? ""
+
+        didChangeSendTransaction(sendTransaction)
+    }
+
+    func showInvalidAddressAlert() {
+        let alert = UIAlertController(
+            title: "Wrong Address 🤷‍♀️",
+            message: "The entered address is an invalid Verge address. Please enter a valid verge address.",
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(title: "Ok", style: .cancel))
+
+        present(alert, animated: true)
+    }
+}
+
+extension SendViewController: SendTransactionDelegate {
+    // MARK: - Send Transaction Delegate
+
+    func didChangeSendTransaction(_ transaction: SendTransaction) {
+        sendTransaction = transaction
+
+        self.recipientTextField.text = sendTransaction.address
+        self.memoTextField.text = sendTransaction.memo
 
         updateAmountLabel()
         updateWalletAmountLabel()
     }
 
-    func currentAmount() -> NSNumber {
-        return amount
+    func getSendTransaction() -> SendTransaction {
+        return sendTransaction
     }
 
+    func currentAmount() -> NSNumber {
+        return currency == .FIAT ? sendTransaction.fiatAmount : sendTransaction.amount
+    }
+
+    func currentCurrency() -> String {
+        return currency == .XVG ? "XVG" : ApplicationManager.default.currency
+    }
 }

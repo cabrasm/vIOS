@@ -2,7 +2,7 @@
 <p align="center">
   <a href="https://travis-ci.org/vergecurrency/vIOS" target="_blank"><img src="https://travis-ci.org/vergecurrency/vIOS.svg?branch=master"></a>
   <img src="https://img.shields.io/badge/status-development-red.svg">
-  <img src="https://img.shields.io/badge/latest build-0.4-lightgrey.svg">
+  <img src="https://img.shields.io/badge/latest build-0.10-lightgrey.svg">
   <img src="https://img.shields.io/badge/iOS-^11.4-green.svg">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg">
 </p>
@@ -28,12 +28,12 @@ So you want to help us out? Here's a guide on how to get started:
 
 2. Now install the following tools via [brew](https://brew.sh) 
 ```sh
-brew install carthage automake autoconf libtool gettext
+brew install carthage
 ```
 
-3. In your cloned project folder run carthage build (this could take awile):
+3. In your cloned project folder run carthage update (this could take awile):
 ```sh
-carthage checkout && carthage build --platform iOS
+carthage update --platform iOS
 ```
 
 4. After that is done, open the project and start coding.
@@ -46,7 +46,12 @@ carthage checkout && carthage build --platform iOS
 * [hackiftekhar/IQKeyboardManager](https://github.com/hackiftekhar/IQKeyboardManager) - Makes working with keyboards and inputs painless
 * [aschuch/QRCode](https://github.com/aschuch/QRCode) - Generates beautiful QR codes for receiving XVG
 * [SwiftyJSON/SwiftyJSON](https://github.com/SwiftyJSON/SwiftyJSON) - Helps working with JSON responses
+* [ReactiveX/RxSwift](https://github.com/ReactiveX/RxSwift) - Adds a reactive programming framework
 * [evgenyneu/keychain-swift](https://github.com/evgenyneu/keychain-swift) - Takes away the worries of saving sensitive user data on your device
+* [HamzaGhazouani/HGPlaceholders](https://github.com/HamzaGhazouani/HGPlaceholders) - Library to show placeholders and Empty States for any UITableView
+* [danielgindi/Charts](https://github.com/danielgindi/Charts) - This library is used for making beautiful charts
+* [JohnEstropia/CoreStore](https://github.com/JohnEstropia/CoreStore) - Handy core data library
+* [xmartlabs/Eureka](https://github.com/xmartlabs/Eureka) - Library for easily creating forms
 
 ### Community
 

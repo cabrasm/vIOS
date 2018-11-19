@@ -8,15 +8,18 @@
 
 import UIKit
 import StoreKit
+import LocalAuthentication
 
-class SettingsTableViewController: UITableViewController {
+class SettingsTableViewController: EdgedTableViewController {
 
     @IBOutlet weak var currencyLabel: UILabel!
+
+    let localAuthIndexPath = IndexPath(row: 2, section: 1)
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
 
-        currencyLabel.text = WalletManager.default.currency
+        currencyLabel.text = ApplicationManager.default.currency
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -33,9 +36,9 @@ class SettingsTableViewController: UITableViewController {
         case 2:
             SKStoreReviewController.requestReview()
         case 3:
-            loadWebsite(url: "https://vergecurrency.com/")
+            loadWebsite(url: Config.website)
         case 4:
-            loadWebsite(url: "https://github.com/vergecurrency/vIOS")
+            loadWebsite(url: Config.iOSRepo)
         default: break
         }
 
@@ -83,5 +86,26 @@ class SettingsTableViewController: UITableViewController {
                 }
             }
         }
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+
+        if indexPath == localAuthIndexPath && LAContext.available(type: .touchID) {
+            cell.textLabel?.text = "Use Touch ID"
+            cell.imageView?.image = UIImage(named: "TouchID")
+        }
+
+        return cell
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        let number = super.tableView(tableView, numberOfRowsInSection: section)
+
+        if section == localAuthIndexPath.section && !LAContext.anyAvailable() {
+            return number - 1
+        }
+
+        return number
     }
 }

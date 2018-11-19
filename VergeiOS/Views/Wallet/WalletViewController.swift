@@ -11,15 +11,14 @@ import SwiftyJSON
 
 class WalletViewController: UIViewController, UIScrollViewDelegate {
 
-    @IBOutlet weak var balanceScrollView: UIScrollView!
-    @IBOutlet weak var balancePageControl: UIPageControl!
-    @IBOutlet weak var blockchainStatusLabelView: UILabel!
-    @IBOutlet weak var xvgFiatPriceLabelView: UILabel!
-    @IBOutlet weak var xvgFiatLabel: UILabel!
+    @IBOutlet weak var xvgBalanceLabel: UILabel!
+    @IBOutlet weak var pairBalanceLabel: UILabel!
+    @IBOutlet weak var pairSymbolBalanceLabel: UILabel!
+    @IBOutlet weak var xvgPairBalanceLabel: UILabel!
+    @IBOutlet weak var xvgPairSymbolLabel: UILabel!
     @IBOutlet weak var walletSlideScrollView: UIScrollView!
     @IBOutlet weak var walletSlidePageControl: UIPageControl!
     
-    var balanceSlides: [BalanceSlide] = []
     var walletSlides: [WalletSlideView] = []
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -36,71 +35,31 @@ class WalletViewController: UIViewController, UIScrollViewDelegate {
         self.setupSlides()
         self.setStats()
 
-        DispatchQueue.main.async {
-            // Set the balance scroll view current page to users defaults.
-            self.balanceScrollView.setCurrent(page: WalletManager.default.currentBalanceSlide)
-        }
-
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(didReceiveStats(notification:)),
             name: .didReceiveStats,
             object: nil
         )
-    }
-    
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        
-        UIApplication.shared.statusBarStyle = .lightContent
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didChangeWalletAmount(notification:)),
+            name: .didChangeWalletAmount,
+            object: nil
+        )
     }
     
     func setupSlides() {
-        self.balanceScrollView.delegate = self
-        self.balanceSlides = self.createBalanceSlides()
-        
         self.walletSlideScrollView.delegate = self
         self.walletSlides = self.createWalletSlides()
         
         DispatchQueue.main.async {
-            self.setupBalanceSlideScrollView()
             self.setupWalletSlideScrollView()
-            
-            for slide in self.balanceSlides {
-                self.balanceScrollView.addSubview(slide)
-            }
             
             for slide in self.walletSlides {
                 self.walletSlideScrollView.addSubview(slide)
             }
-        }
-    }
-    
-    
-    // MARK: - Balance Scroll View
-    
-    func createBalanceSlides() -> [BalanceSlide] {
-        let xvgBalance = Bundle.main.loadNibNamed("XVGBalanceView", owner: self, options: nil)?.first as! XVGBalanceView
-        let fiatBalance = Bundle.main.loadNibNamed("FiatBalanceView", owner: self, options: nil)?.first as! FiatBalanceView
-        let placeholderBalance = Bundle.main.loadNibNamed("PlaceholderView", owner: self, options: nil)?.first as! PlaceholderView
-        
-        return [
-            xvgBalance,
-            fiatBalance,
-            placeholderBalance
-        ]
-    }
-    
-    func setupBalanceSlideScrollView() {
-        let contentSizeWidth = balanceScrollView.frame.width * CGFloat(balanceSlides.count)
-
-        balanceScrollView.contentSize = CGSize(width: contentSizeWidth, height: balanceScrollView.frame.height)
-        
-        for i in 0 ..< balanceSlides.count {
-            let slideX = balanceScrollView.frame.width * CGFloat(i)
-            let slideWidth = balanceScrollView.frame.width
-            
-            balanceSlides[i].frame = CGRect(x: slideX, y: 0, width: slideWidth, height: balanceScrollView.frame.height)
         }
     }
     
@@ -139,39 +98,42 @@ class WalletViewController: UIViewController, UIScrollViewDelegate {
     }
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if (scrollView == balanceScrollView) {
-            let currentPage = Int(round(balanceScrollView.contentOffset.x/balanceScrollView.frame.width))
-            self.balancePageControl.currentPage = currentPage
-
-            DispatchQueue.main.async {
-                // Save the balance slide current page.
-                WalletManager.default.currentBalanceSlide = currentPage
-            }
-        }
-        
         if (scrollView == walletSlideScrollView) {
             let currentPage = Int(round(walletSlideScrollView.contentOffset.x/walletSlideScrollView.frame.width))
             self.walletSlidePageControl.currentPage = currentPage
         }
     }
-
-    @objc func deviceRotated() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.setupWalletSlideScrollView()
-        }
-    }
     
     @objc func didReceiveStats(notification: Notification? = nil) {
-        self.setStats()
+        setStats()
+    }
+
+    @objc func didChangeWalletAmount(notification: Notification? = nil) {
+        setStats()
     }
     
     func setStats() {
         DispatchQueue.main.async {
+            self.xvgBalanceLabel.text = ApplicationManager.default.amount.toCurrency(currency: "XVG", fractDigits: 3)
+
             if let xvgInfo = PriceTicker.shared.xvgInfo {
-                self.xvgFiatPriceLabelView.text = xvgInfo.display.price
-                self.xvgFiatLabel.text = "\(WalletManager.default.currency)/XVG"
+                let walletAmount = ApplicationManager.default.amount
+                self.pairBalanceLabel.text = NSNumber(value: walletAmount.doubleValue * xvgInfo.price).toCurrency()
+                self.pairSymbolBalanceLabel.text = "\(ApplicationManager.default.currency) BALANCE"
+                
+                self.xvgPairBalanceLabel.text = NSNumber(value: xvgInfo.price).toPairCurrency(fractDigits: 6)
+                self.xvgPairSymbolLabel.text = "\(ApplicationManager.default.currency)/XVG"
             }
         }
     }
-
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "TransactionTableViewController" {
+            if let nc = segue.destination as? UINavigationController {
+                if let vc = nc.viewControllers.first as? TransactionTableViewController {
+                    vc.transaction = sender as? TxHistory
+                }
+            }
+        }
+    }
 }

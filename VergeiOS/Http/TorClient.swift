@@ -19,7 +19,7 @@ class TorClient {
     private var controller: TorController!
 
     // Client status?
-    private var isOperational: Bool = false
+    private(set) var isOperational: Bool = false
     private var isConnected: Bool {
         return self.controller.isConnected
     }
@@ -33,7 +33,9 @@ class TorClient {
         return URLSession(configuration: sessionConfiguration)
     }
 
-    init() {
+    private init() {}
+
+    private func setupThread() {
         config.options = [
             "DNSPort": "12345",
             "AutomapHostsOnResolve": "1",
@@ -49,43 +51,88 @@ class TorClient {
             "--socksport", "39050",
             "--controlport", "127.0.0.1:39060",
         ]
-        
+
         thread = TorThread(configuration: config)
     }
 
     // Start the tor client.
     func start(completion: @escaping () -> Void) {
         // If already operational don't start a new client.
-        if isOperational || 1 == 1 {
+        if isOperational || turnedOff() {
             return completion()
         }
 
+        // Make sure we don't have a thread already.
+        if thread == nil {
+            setupThread()
+        }
+
+        // Initiate the controller.
         controller = TorController(socketURL: config.controlSocket!)
         
         // Start a tor thread.
         if thread.isExecuting == false {
             thread.start()
+
+            NotificationCenter.default.post(name: .didStartTorThread, object: self)
         }
 
-        DispatchQueue.main.async {
-            do {
-                if !self.controller.isConnected {
-                    try self.controller?.connect()
-                }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            // Connect Tor controller.
+            self.connectController(completion: completion)
 
-                try self.authenticateController {
-                    completion()
+            // Make sure the controller connects.
+            var interval: Timer!
+            interval = setInterval(4) {
+                if !self.controller.isConnected || !self.isOperational {
+                    print("Retry tor controller connection")
+                    self.connectController(completion: completion)
+                } else {
+                    print("Remove tor controller connection interval")
+                    interval.invalidate()
                 }
-            } catch {
-                print(error.localizedDescription)
-                completion()
             }
         }
     }
 
     // Resign the tor client.
     func resign() {
-        // TODO
+        if isOperational {
+            sessionConfiguration = .default
+            controller.disconnect()
+
+            self.isOperational = false
+            self.thread = nil
+
+            NotificationCenter.default.post(name: .didResignTorConnection, object: self)
+
+            return
+        }
+
+        // Retry in a sec.
+        let _ = setTimeout(1) {
+            self.resign()
+        }
+    }
+
+    private func connectController(completion: @escaping () -> Void) {
+        do {
+            if !self.controller.isConnected {
+                try self.controller?.connect()
+                NotificationCenter.default.post(name: .didConnectTorController, object: self)
+            }
+
+            try self.authenticateController {
+                print("Tor tunnel started! 🤩")
+
+                NotificationCenter.default.post(name: .didEstablishTorConnection, object: self)
+
+                completion()
+            }
+        } catch {
+            print(error.localizedDescription)
+            completion()
+        }
     }
 
     private func authenticateController(completion: @escaping () -> Void) throws -> Void {
@@ -104,7 +151,6 @@ class TorClient {
                 guard established else {
                     return
                 }
-                print("Tor tunnel started! 🤩")
 
                 self.controller?.getSessionConfiguration() { sessionConfig in
                     self.sessionConfiguration = sessionConfig!
@@ -142,5 +188,9 @@ class TorClient {
         }
 
         return documentsDirectory
+    }
+    
+    func turnedOff() -> Bool {
+        return !ApplicationManager.default.useTor
     }
 }

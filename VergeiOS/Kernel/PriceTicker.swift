@@ -14,8 +14,9 @@ class PriceTicker {
 
     private var started: Bool = false
     private var interval: Timer?
-    
-    var xvgInfo: XvgInfo?
+
+    var statisicsClient: StatisicsAPIClient = StatisicsAPIClient()
+    var xvgInfo: Statistics?
 
     init () {
         NotificationCenter.default.addObserver(
@@ -32,16 +33,16 @@ class PriceTicker {
             return
         }
 
-        if !WalletManager.default.setup {
+        if !ApplicationManager.default.setup {
             return
         }
-
-        self.fetchStats()
-
-        self.interval = setInterval(150) {
+        
+        fetchStats()
+        
+        interval = Timer.scheduledTimer(withTimeInterval: Config.fetchPriceTimeout, repeats: true) { timer in
             self.fetchStats()
         }
-
+        
         started = true
         print("Price ticker started...")
     }
@@ -55,9 +56,9 @@ class PriceTicker {
     }
     
     // Fetch statistics from the API and notify all absorbers.
-    private func fetchStats() {
+    @objc private func fetchStats() {
         print("Fetching new stats")
-        StatisicsAPIClient.shared.infoBy(currency: WalletManager.default.currency) { info in
+        statisicsClient.infoBy(currency: ApplicationManager.default.currency) { info in
             self.xvgInfo = info
 
             print("Stats received, posting notification")

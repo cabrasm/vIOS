@@ -8,7 +8,7 @@
 
 import UIKit
 
-class CreditsTableViewController: UITableViewController {
+class CreditsTableViewController: EdgedTableViewController {
 
     var developers = [
         [
@@ -37,6 +37,10 @@ class CreditsTableViewController: UITableViewController {
         [
             "name": "Swen",
             "twitter": "SwenVanZanten"
+        ],
+        [
+            "name": "Vadim",
+            "twitter": "grevcev_vadim"
         ],
     ]
     
