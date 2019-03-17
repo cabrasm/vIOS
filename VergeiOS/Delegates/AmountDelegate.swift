@@ -5,8 +5,8 @@
 
 import Foundation
 
-protocol AmountDelegate {
-    func didChangeAmount(_ transaction: SendTransaction)
+protocol AmountDelegate: class {
+    func didChangeAmount(_ transaction: TransactionFactory)
     func currentAmount() -> NSNumber
     func currentCurrency() -> String
 }

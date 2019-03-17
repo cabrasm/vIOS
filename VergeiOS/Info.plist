@@ -15,7 +15,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.10</string>
+	<string>$(CF_BUNDLE_SHORT_VERSION_STRING)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -30,7 +30,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>0.10</string>
+	<string>$(CF_BUNDLE_SHORT_VERSION_STRING)</string>
 	<key>LSApplicationCategoryType</key>
 	<string></string>
 	<key>LSRequiresIPhoneOS</key>
@@ -56,6 +56,11 @@
 	<string>This app uses Face ID to unlock it</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app uses the photo library to save QR codes</string>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>ReceiveFundsIntent</string>
+		<string>VergePriceIntent</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

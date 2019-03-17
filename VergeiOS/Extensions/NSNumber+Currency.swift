@@ -10,9 +10,12 @@ import UIKit
 
 extension NSNumber {
 
-    func toCurrency(currency: String = ApplicationManager.default.currency, fractDigits: Int = 2) -> String {
+    func toCurrency(currency: String = ApplicationRepository.default.currency, fractDigits: Int = 2, floating: Bool = true) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
+        if floating == false {
+            formatter.minimumFractionDigits = fractDigits
+        }
         formatter.maximumFractionDigits = fractDigits
         
         var suffix = ""
@@ -28,16 +31,37 @@ extension NSNumber {
     }
     
     func toPairCurrency(fractDigits: Int = 2) -> String {
-        return toCurrency(currency: ApplicationManager.default.currency, fractDigits: fractDigits)
+        return toCurrency(currency: ApplicationRepository.default.currency, fractDigits: fractDigits)
     }
     
-    func toXvgCurrency(fractDigits: Int = 2) -> String {
-        return toCurrency(currency: "XVG", fractDigits: fractDigits)
+    func toXvgCurrency(fractDigits: Int? = nil) -> String {
+        var fractDigits = fractDigits
+
+        if fractDigits == nil {
+            fractDigits = Constants.maximumFractionDigits
+
+            if self.doubleValue > 99 {
+                fractDigits = 6
+            }
+
+            if self.doubleValue > 999 {
+                fractDigits = 4
+            }
+
+            if self.doubleValue > 9999 {
+                fractDigits = 2
+            }
+        }
+
+        return toCurrency(currency: "XVG", fractDigits: fractDigits!)
     }
 
-    func toBlankCurrency(fractDigits: Int = 2) -> String {
+    func toBlankCurrency(fractDigits: Int = 2, floating: Bool = true) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
+        if floating == false { // Freeze fractDigits number
+            formatter.minimumFractionDigits = fractDigits
+        }
         formatter.maximumFractionDigits = fractDigits
         formatter.currencyCode = ""
         formatter.currencySymbol = ""

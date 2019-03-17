@@ -80,39 +80,40 @@ class TorClient {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             // Connect Tor controller.
             self.connectController(completion: completion)
-
-            // Make sure the controller connects.
-            var interval: Timer!
-            interval = setInterval(4) {
-                if !self.controller.isConnected || !self.isOperational {
-                    print("Retry tor controller connection")
-                    self.connectController(completion: completion)
-                } else {
-                    print("Remove tor controller connection interval")
-                    interval.invalidate()
-                }
-            }
         }
     }
 
     // Resign the tor client.
-    func resign() {
-        if isOperational {
-            sessionConfiguration = .default
-            controller.disconnect()
-
-            self.isOperational = false
-            self.thread = nil
-
-            NotificationCenter.default.post(name: .didResignTorConnection, object: self)
-
+    func restart() {
+        resign()
+        
+        if !isOperational {
             return
         }
-
-        // Retry in a sec.
-        let _ = setTimeout(1) {
-            self.resign()
+        
+        while controller.isConnected {
+            print("Disconnecting Tor...")
         }
+        
+        NotificationCenter.default.post(name: .didResignTorConnection, object: self)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.start {
+                NotificationCenter.default.post(name: .didConnectTorController, object: self)
+            }
+        }
+    }
+    
+    func resign() {
+        if !isOperational {
+            return
+        }
+        
+        self.controller.disconnect()
+        
+        self.isOperational = false
+        self.thread = nil
+        self.sessionConfiguration = .default
     }
 
     private func connectController(completion: @escaping () -> Void) {
@@ -130,7 +131,8 @@ class TorClient {
                 completion()
             }
         } catch {
-            print(error.localizedDescription)
+            NotificationCenter.default.post(name: .errorDuringTorConnection, object: error)
+
             completion()
         }
     }
@@ -191,6 +193,6 @@ class TorClient {
     }
     
     func turnedOff() -> Bool {
-        return !ApplicationManager.default.useTor
+        return !ApplicationRepository.default.useTor
     }
 }

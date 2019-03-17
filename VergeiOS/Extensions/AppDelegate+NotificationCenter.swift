@@ -39,6 +39,13 @@ extension AppDelegate {
             name: .didTurnOffTor,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(errorDuringTorConnection(notification:)),
+            name: .errorDuringTorConnection,
+            object: nil
+        )
     }
 
     @objc func didStartTorThread(notification: Notification? = nil) {
@@ -59,6 +66,12 @@ extension AppDelegate {
         TorStatusIndicator.shared.setStatus(.turnedOff)
     }
 
+    @objc func errorDuringTorConnection(notification: Notification? = nil) {
+        DispatchQueue.main.async {
+            TorStatusIndicator.shared.setStatus(.error)
+        }
+    }
+
     func setupWalletListeners() {
         NotificationCenter.default.addObserver(
             self,
@@ -71,7 +84,7 @@ extension AppDelegate {
     @objc func didBroadcastTx(notification: Notification) {
         WalletClient.shared.getBalance { error, info in
             if let info = info {
-                ApplicationManager.default.amount = info.totalAmountValue
+                ApplicationRepository.default.amount = info.availableAmountValue
             }
         }
     }
